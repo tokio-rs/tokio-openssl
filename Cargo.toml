@@ -14,3 +14,4 @@ An implementation of SSL streams for Tokio backed by OpenSSL
 openssl = "0.9"
 futures = "0.1"
 tokio-core = "0.1"
+tokio-io = "0.1"
