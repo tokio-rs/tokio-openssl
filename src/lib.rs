@@ -128,11 +128,19 @@ impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {}
 
 impl<S: AsyncRead + AsyncWrite> AsyncWrite for SslStream<S> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        match self.inner.shutdown() {
-            Ok(ShutdownResult::Sent) => Ok(Async::NotReady),
-            Ok(ShutdownResult::Received) => Ok(Async::Ready(())),
-            Err(err) => Err(io::Error::new(io::ErrorKind::Other, err)),
+        loop {
+            match self.inner.shutdown() {
+                Ok(ShutdownResult::Sent) => {},
+                Ok(ShutdownResult::Received) => break,
+                Err(ssl::Error::ZeroReturn) => break,
+                Err(ssl::Error::Stream(e)) => return Err(e),
+                Err(ssl::Error::WantRead(_e)) => return Ok(Async::NotReady),
+                Err(ssl::Error::WantWrite(_e)) => return Ok(Async::NotReady),
+                Err(e) => return Err(io::Error::new(io::ErrorKind::Other, e)),
+            }
         }
+
+        Ok(Async::Ready(()))
     }
 }
 
