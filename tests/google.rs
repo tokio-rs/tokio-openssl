@@ -36,13 +36,16 @@ fn fetch_google() {
     // Send off the request by first negotiating an SSL handshake, then writing
     // of our request, then flushing, then finally read off the response.
     let data = client.and_then(move |socket| {
-                                   let builder = t!(SslConnectorBuilder::new(SslMethod::tls()));
-                                   let connector = builder.build();
-                                   connector.connect_async("google.com", socket).map_err(openssl2io)
-                               })
-        .and_then(|socket| write_all(socket, b"GET / HTTP/1.0\r\n\r\n"))
-        .and_then(|(socket, _)| flush(socket))
-        .and_then(|socket| read_to_end(socket, Vec::new()));
+        let builder = t!(SslConnectorBuilder::new(SslMethod::tls()));
+        let connector = builder.build();
+        connector.connect_async("google.com", socket).map_err(openssl2io)
+    }).and_then(|socket| {
+        write_all(socket, b"GET / HTTP/1.0\r\n\r\n")
+    }).and_then(|(socket, _)| {
+        flush(socket)
+    }).and_then(|socket| {
+        read_to_end(socket, Vec::new())
+    });
 
     let (_, data) = t!(l.run(data));
 

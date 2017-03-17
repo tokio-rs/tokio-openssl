@@ -15,14 +15,17 @@
 #![deny(missing_docs)]
 
 extern crate futures;
-extern crate tokio_io;
 extern crate openssl;
+extern crate tokio_core;
+extern crate tokio_io;
 
 use std::io::{self, Read, Write};
 
 use futures::{Poll, Future, Async};
 use openssl::ssl::{self, SslAcceptor, SslConnector, Error, HandshakeError, ShutdownResult};
 use tokio_io::{AsyncRead, AsyncWrite};
+#[allow(deprecated)]
+use tokio_core::io::Io;
 
 /// A wrapper around an underlying raw stream which implements the SSL
 /// protocol.
@@ -66,8 +69,9 @@ pub trait SslConnectorExt {
     /// example, a TCP connection to a remote server. That stream is then
     /// provided here to perform the client half of a connection to a
     /// TLS-powered server.
+    // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(&self, domain: &str, stream: S) -> ConnectAsync<S>
-        where S: AsyncRead + AsyncWrite;
+        where S: Read + Write;
 }
 
 /// Extension trait for the `SslAcceptor` type in the `openssl` crate.
@@ -82,7 +86,8 @@ pub trait SslAcceptorExt {
     /// This is typically used after a new socket has been accepted from a
     /// `TcpListener`. That socket is then passed to this function to perform
     /// the server half of accepting a client connection.
-    fn accept_async<S>(&self, stream: S) -> AcceptAsync<S> where S: AsyncRead + AsyncWrite;
+    fn accept_async<S>(&self, stream: S) -> AcceptAsync<S>
+        where S: Read + Write;
 }
 
 impl<S> SslStream<S> {
@@ -99,13 +104,13 @@ impl<S> SslStream<S> {
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> Read for SslStream<S> {
+impl<S: Read + Write> Read for SslStream<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> Write for SslStream<S> {
+impl<S: Read + Write> Write for SslStream<S> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
@@ -113,6 +118,10 @@ impl<S: AsyncRead + AsyncWrite> Write for SslStream<S> {
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
+}
+
+#[allow(deprecated)]
+impl<S: Io> Io for SslStream<S> {
 }
 
 impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {}
@@ -129,21 +138,29 @@ impl<S: AsyncRead + AsyncWrite> AsyncWrite for SslStream<S> {
 
 impl SslConnectorExt for SslConnector {
     fn connect_async<S>(&self, domain: &str, stream: S) -> ConnectAsync<S>
-        where S: AsyncRead + AsyncWrite
+        where S: Read + Write,
     {
-        ConnectAsync { inner: MidHandshake { inner: Some(self.connect(domain, stream)) } }
+        ConnectAsync {
+            inner: MidHandshake {
+                inner: Some(self.connect(domain, stream)),
+            },
+        }
     }
 }
 
 impl SslAcceptorExt for SslAcceptor {
     fn accept_async<S>(&self, stream: S) -> AcceptAsync<S>
-        where S: AsyncRead + AsyncWrite
+        where S: Read + Write,
     {
-        AcceptAsync { inner: MidHandshake { inner: Some(self.accept(stream)) } }
+        AcceptAsync {
+            inner: MidHandshake {
+                inner: Some(self.accept(stream)),
+            },
+        }
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> Future for ConnectAsync<S> {
+impl<S: Read + Write> Future for ConnectAsync<S> {
     type Item = SslStream<S>;
     type Error = Error;
 
@@ -152,7 +169,7 @@ impl<S: AsyncRead + AsyncWrite> Future for ConnectAsync<S> {
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> Future for AcceptAsync<S> {
+impl<S: Read + Write> Future for AcceptAsync<S> {
     type Item = SslStream<S>;
     type Error = Error;
 
@@ -161,7 +178,7 @@ impl<S: AsyncRead + AsyncWrite> Future for AcceptAsync<S> {
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> Future for MidHandshake<S> {
+impl<S: Read + Write> Future for MidHandshake<S> {
     type Item = SslStream<S>;
     type Error = Error;
 
