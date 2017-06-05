@@ -124,23 +124,23 @@ impl<S: Read + Write> Write for SslStream<S> {
 impl<S: Io> Io for SslStream<S> {
 }
 
-impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {}
+impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        true
+    }
+}
 
 impl<S: AsyncRead + AsyncWrite> AsyncWrite for SslStream<S> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
-        loop {
-            match self.inner.shutdown() {
-                Ok(ShutdownResult::Sent) => {},
-                Ok(ShutdownResult::Received) => break,
-                Err(ssl::Error::ZeroReturn) => break,
-                Err(ssl::Error::Stream(e)) => return Err(e),
-                Err(ssl::Error::WantRead(_e)) => return Ok(Async::NotReady),
-                Err(ssl::Error::WantWrite(_e)) => return Ok(Async::NotReady),
-                Err(e) => return Err(io::Error::new(io::ErrorKind::Other, e)),
-            }
+        match self.inner.shutdown() {
+            Ok(ShutdownResult::Sent) |
+            Ok(ShutdownResult::Received) |
+            Err(ssl::Error::ZeroReturn) => Ok(Async::Ready(())),
+            Err(ssl::Error::Stream(e)) => Err(e),
+            Err(ssl::Error::WantRead(_e)) |
+            Err(ssl::Error::WantWrite(_e)) => Ok(Async::NotReady),
+            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
         }
-
-        Ok(Async::Ready(()))
     }
 }
 
