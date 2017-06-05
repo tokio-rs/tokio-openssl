@@ -126,6 +126,9 @@ impl<S: Io> Io for SslStream<S> {
 
 impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {
     unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+        // Note that this does not forward to `S` because the buffer is
+        // unconditionally filled in by OpenSSL, not the actual object `S`.
+        // We're decrypting bytes from `S` into the buffer above!
         true
     }
 }
