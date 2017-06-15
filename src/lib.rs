@@ -22,7 +22,8 @@ extern crate tokio_io;
 use std::io::{self, Read, Write};
 
 use futures::{Poll, Future, Async};
-use openssl::ssl::{self, SslAcceptor, SslConnector, Error, HandshakeError, ShutdownResult};
+use openssl::ssl::{self, SslAcceptor, SslConnector, ConnectConfiguration, Error, HandshakeError,
+                   ShutdownResult};
 use tokio_io::{AsyncRead, AsyncWrite};
 #[allow(deprecated)]
 use tokio_core::io::Io;
@@ -71,6 +72,51 @@ pub trait SslConnectorExt {
     /// TLS-powered server.
     // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(&self, domain: &str, stream: S) -> ConnectAsync<S>
+        where S: Read + Write;
+
+    /// Connects the provided stream with this connector, without performing
+    /// hostname verification.
+    ///
+    /// # Warning
+    ///
+    /// You should think very carefully before you use this method. If hostname
+    /// verification is not used, *any* valid certificate for *any* site will
+    /// be trusted for use from any other. This introduces a significant
+    /// vulnerability to man-in-the-middle attacks.
+    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
+        <S>(&self, stream: S) -> ConnectAsync<S>
+        where S: Read + Write;
+}
+
+/// Extension trait for the `ConnectConfiguration` type in the `openssl` crate.
+pub trait ConnectConfigurationExt {
+    /// Connects the provided stream with this connector, assuming the provided
+    /// domain.
+    ///
+    /// This function will internally call `ConnectConfiguration::connect` to
+    /// connect the stream and returns a future representing the resolution of
+    /// the connection operation. The returned future will resolve to either
+    /// `SslStream<S>` or `Error` depending if it's successful or not.
+    ///
+    /// This is typically used for clients who have already established, for
+    /// example, a TCP connection to a remote server. That stream is then
+    /// provided here to perform the client half of a connection to a
+    /// TLS-powered server.
+    // TODO change to AsyncRead/Write on major bump all throughout this file
+    fn connect_async<S>(self, domain: &str, stream: S) -> ConnectAsync<S>
+        where S: Read + Write;
+
+    /// Connects the provided stream with this connector, without performing
+    /// hostname verification.
+    ///
+    /// # Warning
+    ///
+    /// You should think very carefully before you use this method. If hostname
+    /// verification is not used, *any* valid certificate for *any* site will
+    /// be trusted for use from any other. This introduces a significant
+    /// vulnerability to man-in-the-middle attacks.
+    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
+        <S>(self, stream: S) -> ConnectAsync<S>
         where S: Read + Write;
 }
 
@@ -154,6 +200,40 @@ impl SslConnectorExt for SslConnector {
         ConnectAsync {
             inner: MidHandshake {
                 inner: Some(self.connect(domain, stream)),
+            },
+        }
+    }
+
+    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
+        <S>(&self, stream: S) -> ConnectAsync<S>
+        where S: Read + Write
+    {
+        ConnectAsync {
+            inner: MidHandshake {
+                inner: Some(self.danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication(stream)),
+            },
+        }
+    }
+}
+
+impl ConnectConfigurationExt for ConnectConfiguration {
+    fn connect_async<S>(self, domain: &str, stream: S) -> ConnectAsync<S>
+        where S: Read + Write,
+    {
+        ConnectAsync {
+            inner: MidHandshake {
+                inner: Some(self.connect(domain, stream)),
+            },
+        }
+    }
+
+    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
+        <S>(self, stream: S) -> ConnectAsync<S>
+        where S: Read + Write
+    {
+        ConnectAsync {
+            inner: MidHandshake {
+                inner: Some(self.danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication(stream)),
             },
         }
     }
