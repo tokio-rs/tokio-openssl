@@ -32,11 +32,20 @@ crate]. These extension traits provide the ability to connect a stream
 asynchronously and accept a socket asynchronously. Configuration of OpenSSL
 parameters is still done through the support in the `openssl` crate.
 
+
 # License
 
-`tokio-openssl` is primarily distributed under the terms of both the MIT license
-and the Apache License (Version 2.0), with portions covered by various BSD-like
-licenses.
+Serde is licensed under either of
 
-See LICENSE-APACHE, and LICENSE-MIT for details.
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+   http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or
+   http://opensource.org/licenses/MIT)
 
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in Serde by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
