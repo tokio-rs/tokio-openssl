@@ -149,6 +149,13 @@ impl<S> SslStream<S> {
         &mut self.inner
     }
 }
+impl<S> From<ssl::SslStream<S>> for SslStream<S> {
+    fn from(ssl: ssl::SslStream<S>) -> Self {
+        Self {
+            inner: ssl
+        }
+    }
+}
 
 impl<S: Read + Write> Read for SslStream<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
