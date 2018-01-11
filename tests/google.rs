@@ -8,7 +8,7 @@ use std::io;
 use std::net::ToSocketAddrs;
 
 use futures::Future;
-use openssl::ssl::{SslConnectorBuilder, SslMethod};
+use openssl::ssl::{SslConnector, SslMethod};
 use tokio_io::io::{flush, write_all, read_to_end};
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Core;
@@ -36,7 +36,7 @@ fn fetch_google() {
     // Send off the request by first negotiating an SSL handshake, then writing
     // of our request, then flushing, then finally read off the response.
     let data = client.and_then(move |socket| {
-        let builder = t!(SslConnectorBuilder::new(SslMethod::tls()));
+        let builder = t!(SslConnector::builder(SslMethod::tls()));
         let connector = builder.build();
         connector.connect_async("google.com", socket).map_err(openssl2io)
     }).and_then(|socket| {

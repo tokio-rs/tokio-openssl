@@ -23,7 +23,7 @@ use std::io::{self, Read, Write};
 
 use futures::{Poll, Future, Async};
 use openssl::ssl::{self, SslAcceptor, SslConnector, ConnectConfiguration, Error, HandshakeError,
-                   ShutdownResult};
+                   ShutdownResult, ErrorCode};
 use tokio_io::{AsyncRead, AsyncWrite};
 #[allow(deprecated)]
 use tokio_core::io::Io;
@@ -73,19 +73,6 @@ pub trait SslConnectorExt {
     // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(&self, domain: &str, stream: S) -> ConnectAsync<S>
         where S: Read + Write;
-
-    /// Connects the provided stream with this connector, without performing
-    /// hostname verification.
-    ///
-    /// # Warning
-    ///
-    /// You should think very carefully before you use this method. If hostname
-    /// verification is not used, *any* valid certificate for *any* site will
-    /// be trusted for use from any other. This introduces a significant
-    /// vulnerability to man-in-the-middle attacks.
-    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
-        <S>(&self, stream: S) -> ConnectAsync<S>
-        where S: Read + Write;
 }
 
 /// Extension trait for the `ConnectConfiguration` type in the `openssl` crate.
@@ -104,19 +91,6 @@ pub trait ConnectConfigurationExt {
     /// TLS-powered server.
     // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(self, domain: &str, stream: S) -> ConnectAsync<S>
-        where S: Read + Write;
-
-    /// Connects the provided stream with this connector, without performing
-    /// hostname verification.
-    ///
-    /// # Warning
-    ///
-    /// You should think very carefully before you use this method. If hostname
-    /// verification is not used, *any* valid certificate for *any* site will
-    /// be trusted for use from any other. This introduces a significant
-    /// vulnerability to man-in-the-middle attacks.
-    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
-        <S>(self, stream: S) -> ConnectAsync<S>
         where S: Read + Write;
 }
 
@@ -190,12 +164,10 @@ impl<S: AsyncRead + AsyncWrite> AsyncWrite for SslStream<S> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         match self.inner.shutdown() {
             Ok(ShutdownResult::Sent) |
-            Ok(ShutdownResult::Received) |
-            Err(ssl::Error::ZeroReturn) => Ok(Async::Ready(())),
-            Err(ssl::Error::Stream(e)) => Err(e),
-            Err(ssl::Error::WantRead(_e)) |
-            Err(ssl::Error::WantWrite(_e)) => Ok(Async::NotReady),
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
+            Ok(ShutdownResult::Received) => Ok(Async::Ready(())),
+            Err(ref e) if e.code() == ErrorCode::ZERO_RETURN => Ok(Async::Ready(())),
+            Err(ref e) if e.code() == ErrorCode::WANT_READ || e.code() == ErrorCode::WANT_WRITE => Ok(Async::NotReady),
+            Err(e) => Err(e.into_io_error().unwrap_or_else(|e| io::Error::new(io::ErrorKind::Other, e))),
         }
     }
 }
@@ -210,17 +182,6 @@ impl SslConnectorExt for SslConnector {
             },
         }
     }
-
-    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
-        <S>(&self, stream: S) -> ConnectAsync<S>
-        where S: Read + Write
-    {
-        ConnectAsync {
-            inner: MidHandshake {
-                inner: Some(self.danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication(stream)),
-            },
-        }
-    }
 }
 
 impl ConnectConfigurationExt for ConnectConfiguration {
@@ -230,17 +191,6 @@ impl ConnectConfigurationExt for ConnectConfiguration {
         ConnectAsync {
             inner: MidHandshake {
                 inner: Some(self.connect(domain, stream)),
-            },
-        }
-    }
-
-    fn danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication_async
-        <S>(self, stream: S) -> ConnectAsync<S>
-        where S: Read + Write
-    {
-        ConnectAsync {
-            inner: MidHandshake {
-                inner: Some(self.danger_connect_without_providing_domain_for_certificate_verification_and_server_name_indication(stream)),
             },
         }
     }
@@ -284,14 +234,14 @@ impl<S: Read + Write> Future for MidHandshake<S> {
         match self.inner.take().expect("cannot poll MidHandshake twice") {
             Ok(stream) => Ok(SslStream { inner: stream }.into()),
             Err(HandshakeError::Failure(e)) => Err(e.into_error()),
-            Err(HandshakeError::SetupFailure(e)) => Err(Error::Ssl(e)),
-            Err(HandshakeError::Interrupted(s)) => {
+            Err(HandshakeError::SetupFailure(e)) => Err(Error::from(e)),
+            Err(HandshakeError::WouldBlock(s)) => {
                 match s.handshake() {
                     Ok(stream) => Ok(SslStream { inner: stream }.into()),
                     Err(HandshakeError::Failure(e)) => Err(e.into_error()),
-                    Err(HandshakeError::SetupFailure(e)) => Err(Error::Ssl(e)),
-                    Err(HandshakeError::Interrupted(s)) => {
-                        self.inner = Some(Err(HandshakeError::Interrupted(s)));
+                    Err(HandshakeError::SetupFailure(e)) => Err(Error::from(e)),
+                    Err(HandshakeError::WouldBlock(s)) => {
+                        self.inner = Some(Err(HandshakeError::WouldBlock(s)));
                         Ok(Async::NotReady)
                     }
                 }
