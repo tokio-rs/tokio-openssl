@@ -25,8 +25,6 @@ use futures::{Poll, Future, Async};
 use openssl::ssl::{self, SslAcceptor, SslConnector, ConnectConfiguration, Error, HandshakeError,
                    ShutdownResult, ErrorCode};
 use tokio_io::{AsyncRead, AsyncWrite};
-#[allow(deprecated)]
-use tokio_core::io::Io;
 
 /// A wrapper around an underlying raw stream which implements the SSL
 /// protocol.
@@ -145,10 +143,6 @@ impl<S: Read + Write> Write for SslStream<S> {
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
-}
-
-#[allow(deprecated)]
-impl<S: Io> Io for SslStream<S> {
 }
 
 impl<S: AsyncRead + AsyncWrite> AsyncRead for SslStream<S> {
