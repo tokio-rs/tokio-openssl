@@ -1,6 +1,6 @@
 [package]
 name = "tokio-openssl"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/alexcrichton/tokio-openssl"
@@ -9,7 +9,6 @@ documentation = "https://docs.rs/tokio-openssl"
 description = """
 An implementation of SSL streams for Tokio backed by OpenSSL
 """
-publish = false # needs a major version bump w/ new openssl version
 
 [dependencies]
 openssl = "0.10.1"
