@@ -70,7 +70,7 @@ pub trait SslConnectorExt {
     /// TLS-powered server.
     // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(&self, domain: &str, stream: S) -> ConnectAsync<S>
-        where S: Read + Write;
+        where S: AsyncRead + AsyncWrite;
 }
 
 /// Extension trait for the `ConnectConfiguration` type in the `openssl` crate.
@@ -89,7 +89,7 @@ pub trait ConnectConfigurationExt {
     /// TLS-powered server.
     // TODO change to AsyncRead/Write on major bump all throughout this file
     fn connect_async<S>(self, domain: &str, stream: S) -> ConnectAsync<S>
-        where S: Read + Write;
+        where S: AsyncRead + AsyncWrite;
 }
 
 /// Extension trait for the `SslAcceptor` type in the `openssl` crate.
@@ -105,7 +105,7 @@ pub trait SslAcceptorExt {
     /// `TcpListener`. That socket is then passed to this function to perform
     /// the server half of accepting a client connection.
     fn accept_async<S>(&self, stream: S) -> AcceptAsync<S>
-        where S: Read + Write;
+        where S: AsyncRead + AsyncWrite;
 }
 
 impl<S> SslStream<S> {
