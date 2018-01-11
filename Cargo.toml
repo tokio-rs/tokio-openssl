@@ -9,6 +9,7 @@ documentation = "https://docs.rs/tokio-openssl"
 description = """
 An implementation of SSL streams for Tokio backed by OpenSSL
 """
+publish = false # needs a major version bump w/ new openssl version
 
 [dependencies]
 openssl = "0.10.1"
