@@ -16,7 +16,6 @@
 
 extern crate futures;
 extern crate openssl;
-extern crate tokio_core;
 extern crate tokio_io;
 
 use std::io::{self, Read, Write};
