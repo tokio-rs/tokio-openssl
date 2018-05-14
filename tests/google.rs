@@ -1,6 +1,6 @@
 extern crate futures;
 extern crate openssl;
-extern crate tokio_core;
+extern crate tokio;
 extern crate tokio_openssl;
 extern crate tokio_io;
 
@@ -10,8 +10,8 @@ use std::net::ToSocketAddrs;
 use futures::Future;
 use openssl::ssl::{SslConnector, SslMethod};
 use tokio_io::io::{flush, write_all, read_to_end};
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Core;
+use tokio::net::TcpStream;
+use tokio::runtime::current_thread::Runtime;
 use tokio_openssl::SslConnectorExt;
 
 macro_rules! t {
@@ -29,8 +29,8 @@ fn openssl2io(e: openssl::ssl::Error) -> io::Error {
 fn fetch_google() {
     let addr = t!("google.com:443".to_socket_addrs()).next().unwrap();
 
-    let mut l = t!(Core::new());
-    let client = TcpStream::connect(&addr, &l.handle());
+    let mut l = t!(Runtime::new());
+    let client = TcpStream::connect(&addr);
 
 
     // Send off the request by first negotiating an SSL handshake, then writing
@@ -47,7 +47,7 @@ fn fetch_google() {
         read_to_end(socket, Vec::new())
     });
 
-    let (_, data) = t!(l.run(data));
+    let (_, data) = t!(l.block_on(data));
 
     // any response code is fine
     assert!(data.starts_with(b"HTTP/1.0 "));
