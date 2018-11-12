@@ -21,7 +21,7 @@ extern crate tokio_io;
 use std::io::{self, Read, Write};
 
 use futures::{Poll, Future, Async};
-use openssl::ssl::{self, SslAcceptor, SslConnector, ConnectConfiguration, Error, HandshakeError,
+use openssl::ssl::{self, SslAcceptor, SslConnector, ConnectConfiguration, HandshakeError,
                    ShutdownResult, ErrorCode};
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -203,42 +203,40 @@ impl SslAcceptorExt for SslAcceptor {
 
 impl<S: Read + Write> Future for ConnectAsync<S> {
     type Item = SslStream<S>;
-    type Error = Error;
+    type Error = HandshakeError<S>;
 
-    fn poll(&mut self) -> Poll<SslStream<S>, Error> {
+    fn poll(&mut self) -> Poll<SslStream<S>, HandshakeError<S>> {
         self.inner.poll()
     }
 }
 
 impl<S: Read + Write> Future for AcceptAsync<S> {
     type Item = SslStream<S>;
-    type Error = Error;
+    type Error = HandshakeError<S>;
 
-    fn poll(&mut self) -> Poll<SslStream<S>, Error> {
+    fn poll(&mut self) -> Poll<SslStream<S>, HandshakeError<S>> {
         self.inner.poll()
     }
 }
 
 impl<S: Read + Write> Future for MidHandshake<S> {
     type Item = SslStream<S>;
-    type Error = Error;
+    type Error = HandshakeError<S>;
 
-    fn poll(&mut self) -> Poll<SslStream<S>, Error> {
+    fn poll(&mut self) -> Poll<SslStream<S>, HandshakeError<S>> {
         match self.inner.take().expect("cannot poll MidHandshake twice") {
             Ok(stream) => Ok(SslStream { inner: stream }.into()),
-            Err(HandshakeError::Failure(e)) => Err(e.into_error()),
-            Err(HandshakeError::SetupFailure(e)) => Err(Error::from(e)),
             Err(HandshakeError::WouldBlock(s)) => {
                 match s.handshake() {
                     Ok(stream) => Ok(SslStream { inner: stream }.into()),
-                    Err(HandshakeError::Failure(e)) => Err(e.into_error()),
-                    Err(HandshakeError::SetupFailure(e)) => Err(Error::from(e)),
                     Err(HandshakeError::WouldBlock(s)) => {
                         self.inner = Some(Err(HandshakeError::WouldBlock(s)));
                         Ok(Async::NotReady)
                     }
+                    Err(e) => Err(e)
                 }
             }
+            Err(e) => Err(e),
         }
     }
 }
