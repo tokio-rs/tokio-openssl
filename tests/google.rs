@@ -4,6 +4,7 @@ extern crate tokio;
 extern crate tokio_openssl;
 extern crate tokio_io;
 
+use std::error::Error;
 use std::io;
 use std::net::ToSocketAddrs;
 
@@ -21,7 +22,10 @@ macro_rules! t {
     })
 }
 
-fn openssl2io(e: openssl::ssl::Error) -> io::Error {
+fn openssl2io<E>(e: E) -> io::Error
+where
+    E: Error + 'static + Sync + Send,
+{
     io::Error::new(io::ErrorKind::Other, e)
 }
 
