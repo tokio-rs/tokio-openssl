@@ -1,62 +1,75 @@
-extern crate futures;
-extern crate openssl;
-extern crate tokio;
-extern crate tokio_openssl;
-extern crate tokio_io;
+#![feature(async_await)]
 
-use std::error::Error;
-use std::io;
+use futures::future;
+use openssl::ssl::{SslConnector, SslMethod, SslAcceptor, SslFiletype};
 use std::net::ToSocketAddrs;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncWrite};
+use tokio::net::{TcpStream, TcpListener};
+use std::pin::Pin;
 
-use futures::Future;
-use openssl::ssl::{SslConnector, SslMethod};
-use tokio_io::io::{flush, write_all, read_to_end};
-use tokio::net::TcpStream;
-use tokio::runtime::current_thread::Runtime;
-use tokio_openssl::SslConnectorExt;
+#[tokio::test]
+async fn google() {
+    let addr = "google.com:443".to_socket_addrs().unwrap().next().unwrap();
+    let stream = TcpStream::connect(&addr).await.unwrap();
 
-macro_rules! t {
-    ($e:expr) => (match $e {
-        Ok(e) => e,
-        Err(e) => panic!("{} failed with {:?}", stringify!($e), e),
-    })
-}
+    let config = SslConnector::builder(SslMethod::tls())
+        .unwrap()
+        .build()
+        .configure()
+        .unwrap();
+    let mut stream = tokio_openssl::connect(config, "google.com", stream)
+        .await
+        .unwrap();
 
-fn openssl2io<E>(e: E) -> io::Error
-where
-    E: Error + 'static + Sync + Send,
-{
-    io::Error::new(io::ErrorKind::Other, e)
-}
+    stream.write_all(b"GET / HTTP/1.0\r\n\r\n").await.unwrap();
 
-#[test]
-fn fetch_google() {
-    let addr = t!("google.com:443".to_socket_addrs()).next().unwrap();
-
-    let mut l = t!(Runtime::new());
-    let client = TcpStream::connect(&addr);
-
-
-    // Send off the request by first negotiating an SSL handshake, then writing
-    // of our request, then flushing, then finally read off the response.
-    let data = client.and_then(move |socket| {
-        let builder = t!(SslConnector::builder(SslMethod::tls()));
-        let connector = builder.build();
-        connector.connect_async("google.com", socket).map_err(openssl2io)
-    }).and_then(|socket| {
-        write_all(socket, b"GET / HTTP/1.0\r\n\r\n")
-    }).and_then(|(socket, _)| {
-        flush(socket)
-    }).and_then(|socket| {
-        read_to_end(socket, Vec::new())
-    });
-
-    let (_, data) = t!(l.block_on(data));
+    let mut buf = vec![];
+    stream.read_to_end(&mut buf).await.unwrap();
+    let response = String::from_utf8_lossy(&buf);
+    let response = response.trim_end();
 
     // any response code is fine
-    assert!(data.starts_with(b"HTTP/1.0 "));
+    assert!(response.starts_with("HTTP/1.0 "));
+    assert!(response.ends_with("</html>") || response.ends_with("</HTML>"));
+}
 
-    let data = String::from_utf8_lossy(&data);
-    let data = data.trim_right();
-    assert!(data.ends_with("</html>") || data.ends_with("</HTML>"));
+#[tokio::test]
+async fn server() {
+    let mut listener = TcpListener::bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server = async move {
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        acceptor.set_private_key_file("tests/key.pem", SslFiletype::PEM).unwrap();
+        acceptor.set_certificate_chain_file("tests/cert.pem").unwrap();
+        let acceptor = acceptor.build();
+
+        let stream = listener.accept().await.unwrap().0;
+        let mut stream = tokio_openssl::accept(&acceptor, stream).await.unwrap();
+
+        let mut buf = [0; 4];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(&buf, b"asdf");
+
+        stream.write_all(b"jkl;").await.unwrap();
+
+        future::poll_fn(|ctx| Pin::new(&mut stream).poll_shutdown(ctx)).await.unwrap()
+    };
+
+    let client = async {
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+        connector.set_ca_file("tests/cert.pem").unwrap();
+        let config = connector.build().configure().unwrap();
+
+        let stream = TcpStream::connect(&addr).await.unwrap();
+        let mut stream = tokio_openssl::connect(config, "localhost", stream).await.unwrap();
+
+        stream.write_all(b"asdf").await.unwrap();
+
+        let mut buf = vec![];
+        stream.read_to_end(&mut buf).await.unwrap();
+        assert_eq!(buf, b"jkl;");
+    };
+
+    future::join(server, client).await;
 }
