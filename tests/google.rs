@@ -1,11 +1,11 @@
 #![feature(async_await)]
 
 use futures::future;
-use openssl::ssl::{SslConnector, SslMethod, SslAcceptor, SslFiletype};
+use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod};
 use std::net::ToSocketAddrs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncWrite};
-use tokio::net::{TcpStream, TcpListener};
 use std::pin::Pin;
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::test]
 async fn google() {
@@ -40,8 +40,12 @@ async fn server() {
 
     let server = async move {
         let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-        acceptor.set_private_key_file("tests/key.pem", SslFiletype::PEM).unwrap();
-        acceptor.set_certificate_chain_file("tests/cert.pem").unwrap();
+        acceptor
+            .set_private_key_file("tests/key.pem", SslFiletype::PEM)
+            .unwrap();
+        acceptor
+            .set_certificate_chain_file("tests/cert.pem")
+            .unwrap();
         let acceptor = acceptor.build();
 
         let stream = listener.accept().await.unwrap().0;
@@ -53,7 +57,9 @@ async fn server() {
 
         stream.write_all(b"jkl;").await.unwrap();
 
-        future::poll_fn(|ctx| Pin::new(&mut stream).poll_shutdown(ctx)).await.unwrap()
+        future::poll_fn(|ctx| Pin::new(&mut stream).poll_shutdown(ctx))
+            .await
+            .unwrap()
     };
 
     let client = async {
@@ -62,7 +68,9 @@ async fn server() {
         let config = connector.build().configure().unwrap();
 
         let stream = TcpStream::connect(&addr).await.unwrap();
-        let mut stream = tokio_openssl::connect(config, "localhost", stream).await.unwrap();
+        let mut stream = tokio_openssl::connect(config, "localhost", stream)
+            .await
+            .unwrap();
 
         stream.write_all(b"asdf").await.unwrap();
 

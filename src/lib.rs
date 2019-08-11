@@ -11,21 +11,20 @@
 //! functionality provided by the `openssl` crate, on which this crate is
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `openssl` crate.
-
 #![feature(async_await)]
 #![warn(missing_docs)]
 
 use openssl::ssl::{
     self, ConnectConfiguration, ErrorCode, MidHandshakeSslStream, ShutdownResult, SslAcceptor,
-    SslConnector, SslRef,
+    SslRef,
 };
+use std::error::Error;
+use std::fmt;
 use std::future::Future;
 use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{fmt, mem};
 use tokio_io::{AsyncRead, AsyncWrite};
-use std::error::Error;
 
 /// Asynchronously performs a client-side TLS handshake over the provided stream.
 pub async fn connect<S>(
@@ -33,31 +32,28 @@ pub async fn connect<S>(
     domain: &str,
     stream: S,
 ) -> Result<SslStream<S>, HandshakeError<S>>
-    where
-        S: AsyncRead + AsyncWrite + Unpin,
+where
+    S: AsyncRead + AsyncWrite + Unpin,
 {
     handshake(|s| config.connect(domain, s), stream).await
 }
 
 /// Asynchronously performs a server-side TLS handshake over the provided stream.
-pub async fn accept<S>(
-    acceptor: &SslAcceptor,
-    stream: S,
-) -> Result<SslStream<S>, HandshakeError<S>>
-    where
-        S: AsyncRead + AsyncWrite + Unpin,
+pub async fn accept<S>(acceptor: &SslAcceptor, stream: S) -> Result<SslStream<S>, HandshakeError<S>>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
 {
     handshake(|s| acceptor.accept(s), stream).await
 }
 
 async fn handshake<F, S>(f: F, stream: S) -> Result<SslStream<S>, HandshakeError<S>>
-    where
-        F: FnOnce(
+where
+    F: FnOnce(
             StreamWrapper<S>,
         )
             -> Result<ssl::SslStream<StreamWrapper<S>>, ssl::HandshakeError<StreamWrapper<S>>>
         + Unpin,
-        S: AsyncRead + AsyncWrite + Unpin,
+    S: AsyncRead + AsyncWrite + Unpin,
 {
     let start = StartHandshakeFuture(Some(StartHandshakeFutureInner { f, stream }));
 
@@ -227,6 +223,7 @@ where
     }
 }
 
+/// The error type returned after a failed handshake.
 pub struct HandshakeError<S>(ssl::HandshakeError<StreamWrapper<S>>);
 
 impl<S> fmt::Debug for HandshakeError<S>
@@ -238,13 +235,19 @@ where
     }
 }
 
-impl<S> fmt::Display for HandshakeError<S> where S: fmt::Debug {
+impl<S> fmt::Display for HandshakeError<S>
+where
+    S: fmt::Debug,
+{
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, fmt)
     }
 }
 
-impl<S> Error for HandshakeError<S> where S: fmt::Debug {
+impl<S> Error for HandshakeError<S>
+where
+    S: fmt::Debug,
+{
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.0.source()
     }
@@ -277,7 +280,7 @@ where
         mut self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
     ) -> Poll<Result<StartedHandshake<S>, HandshakeError<S>>> {
-        let mut inner = self.0.take().expect("future polled after completion");
+        let inner = self.0.take().expect("future polled after completion");
 
         let stream = StreamWrapper {
             stream: inner.stream,
