@@ -11,7 +11,6 @@
 //! functionality provided by the `openssl` crate, on which this crate is
 //! built. Configuration of TLS parameters is still primarily done through the
 //! `openssl` crate.
-#![feature(async_await)]
 #![warn(missing_docs)]
 
 use openssl::ssl::{

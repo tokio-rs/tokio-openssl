@@ -13,8 +13,8 @@ An implementation of SSL streams for Tokio backed by OpenSSL
 
 [dependencies]
 openssl = "0.10.1"
-tokio-io = "=0.2.0-alpha.2"
+tokio-io = "=0.2.0-alpha.4"
 
 [dev-dependencies]
 futures-preview = "=0.3.0-alpha.18"
-tokio = "=0.2.0-alpha.2"
+tokio = "=0.2.0-alpha.4"
