@@ -23,7 +23,8 @@ use std::future::Future;
 use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
+use std::mem::MaybeUninit;
 
 /// Asynchronously performs a client-side TLS handshake over the provided stream.
 pub async fn connect<S>(
@@ -172,7 +173,7 @@ impl<S> AsyncRead for SslStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
-    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, _: &mut [MaybeUninit<u8>]) -> bool {
         // Note that this does not forward to `S` because the buffer is
         // unconditionally filled in by OpenSSL, not the actual object `S`.
         // We're decrypting bytes from `S` into the buffer above!
