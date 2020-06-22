@@ -226,6 +226,16 @@ where
 /// The error type returned after a failed handshake.
 pub struct HandshakeError<S>(ssl::HandshakeError<StreamWrapper<S>>);
 
+impl<S> HandshakeError<S> {
+    /// Returns a shared reference to the `Ssl` object associated with this error.
+    pub fn ssl(&self) -> Option<&SslRef> {
+        match &self.0 {
+            ssl::HandshakeError::Failure(s) => Some(s.ssl()),
+            _ => None,
+        }
+    }
+}
+
 impl<S> fmt::Debug for HandshakeError<S>
 where
     S: fmt::Debug,
