@@ -12,7 +12,8 @@ An implementation of SSL streams for Tokio backed by OpenSSL
 """
 
 [dependencies]
-openssl = "0.10.1"
+openssl = "0.10.30"
+openssl-sys = "0.9.58"
 tokio = "0.2"
 
 [dev-dependencies]
