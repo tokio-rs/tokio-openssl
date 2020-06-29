@@ -17,6 +17,7 @@ use openssl::ssl::{
     self, ConnectConfiguration, ErrorCode, MidHandshakeSslStream, ShutdownResult, SslAcceptor,
     SslRef,
 };
+use openssl_sys as ffi;
 use std::error::Error;
 use std::fmt;
 use std::future::Future;
@@ -166,6 +167,26 @@ impl<S> SslStream<S> {
         let r = f(&mut self.0);
         self.0.get_mut().context = 0;
         r
+    }
+}
+
+impl<S> SslStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    /// Constructs an `SslStream` from a pointer to the underlying OpenSSL `SSL` struct.
+    ///
+    /// This is useful if the handshake has already been completed elsewhere.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the pointer is valid.
+    pub unsafe fn from_raw_parts(ssl: *mut ffi::SSL, stream: S) -> Self {
+        let stream = StreamWrapper {
+            stream,
+            context: 0,
+        };
+        SslStream(ssl::SslStream::from_raw_parts(ssl, stream))
     }
 }
 
