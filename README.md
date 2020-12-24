@@ -2,8 +2,6 @@
 
 An implementation of SSL streams for Tokio built on top of the [`openssl` crate]
 
-[![Build Status](https://travis-ci.org/alexcrichton//tokio-openssl.svg?branch=master)](https://travis-ci.org/sfackler/tokio-openssl)
-
 [Documentation](https://docs.rs/tokio-openssl)
 
 [`openssl` crate]: https://github.com/sfackler/rust-openssl
