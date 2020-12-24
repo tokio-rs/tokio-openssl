@@ -1,5 +1,6 @@
+use crate::SslStream;
 use futures::future;
-use openssl::ssl::{SslAcceptor, SslConnector, SslFiletype, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslConnector, SslFiletype, SslMethod};
 use std::net::ToSocketAddrs;
 use std::pin::Pin;
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -10,14 +11,16 @@ async fn google() {
     let addr = "google.com:443".to_socket_addrs().unwrap().next().unwrap();
     let stream = TcpStream::connect(&addr).await.unwrap();
 
-    let config = SslConnector::builder(SslMethod::tls())
+    let ssl = SslConnector::builder(SslMethod::tls())
         .unwrap()
         .build()
         .configure()
+        .unwrap()
+        .into_ssl("google.com")
         .unwrap();
-    let mut stream = tokio_openssl::connect(config, "google.com", stream)
-        .await
-        .unwrap();
+    let mut stream = SslStream::new(ssl, stream).unwrap();
+
+    Pin::new(&mut stream).connect().await.unwrap();
 
     stream.write_all(b"GET / HTTP/1.0\r\n\r\n").await.unwrap();
 
@@ -46,8 +49,11 @@ async fn server() {
             .unwrap();
         let acceptor = acceptor.build();
 
+        let ssl = Ssl::new(acceptor.context()).unwrap();
         let stream = listener.accept().await.unwrap().0;
-        let mut stream = tokio_openssl::accept(&acceptor, stream).await.unwrap();
+        let mut stream = SslStream::new(ssl, stream).unwrap();
+
+        Pin::new(&mut stream).accept().await.unwrap();
 
         let mut buf = [0; 4];
         stream.read_exact(&mut buf).await.unwrap();
@@ -63,12 +69,17 @@ async fn server() {
     let client = async {
         let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
         connector.set_ca_file("tests/cert.pem").unwrap();
-        let config = connector.build().configure().unwrap();
+        let ssl = connector
+            .build()
+            .configure()
+            .unwrap()
+            .into_ssl("localhost")
+            .unwrap();
 
         let stream = TcpStream::connect(&addr).await.unwrap();
-        let mut stream = tokio_openssl::connect(config, "localhost", stream)
-            .await
-            .unwrap();
+        let mut stream = SslStream::new(ssl, stream).unwrap();
+
+        Pin::new(&mut stream).connect().await.unwrap();
 
         stream.write_all(b"asdf").await.unwrap();
 
