@@ -146,6 +146,44 @@ where
     pub async fn do_handshake(mut self: Pin<&mut Self>) -> Result<(), ssl::Error> {
         future::poll_fn(|cx| self.as_mut().poll_do_handshake(cx)).await
     }
+
+    /// Like [`SslStream::read_early_data`](ssl::SslStream::read_early_data).
+    #[cfg(ossl111)]
+    pub fn poll_read_early_data(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, ssl::Error>> {
+        self.with_context(cx, |s| cvt_ossl(s.read_early_data(buf)))
+    }
+
+    /// A convenience method wrapping [`poll_read_early_data`](Self::poll_read_early_data).
+    #[cfg(ossl111)]
+    pub async fn read_early_data(
+        mut self: Pin<&mut Self>,
+        buf: &mut [u8],
+    ) -> Result<usize, ssl::Error> {
+        future::poll_fn(|cx| self.as_mut().poll_read_early_data(cx, buf)).await
+    }
+
+    /// Like [`SslStream::write_early_data`](ssl::SslStream::write_early_data).
+    #[cfg(ossl111)]
+    pub fn poll_write_early_data(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, ssl::Error>> {
+        self.with_context(cx, |s| cvt_ossl(s.write_early_data(buf)))
+    }
+
+    /// A convenience method wrapping [`poll_write_early_data`](Self::poll_write_early_data).
+    #[cfg(ossl111)]
+    pub async fn write_early_data(
+        mut self: Pin<&mut Self>,
+        buf: &[u8],
+    ) -> Result<usize, ssl::Error> {
+        future::poll_fn(|cx| self.as_mut().poll_write_early_data(cx, buf)).await
+    }
 }
 
 impl<S> SslStream<S> {
