@@ -263,8 +263,21 @@ where
 
     fn poll_shutdown(mut self: Pin<&mut Self>, ctx: &mut Context) -> Poll<io::Result<()>> {
         match self.as_mut().with_context(ctx, |s| s.shutdown()) {
-            Ok(ShutdownResult::Sent) | Ok(ShutdownResult::Received) => {}
-            Err(ref e) if e.code() == ErrorCode::ZERO_RETURN => {}
+            Ok(ShutdownResult::Sent) => {
+                // close notify sent but not received from peer
+                // another try to wait for peer's close notify
+                // The OpenSSL manpage suggests SSL_read(), both of them should be okay
+                // https://github.com/openssl/openssl/blob/OpenSSL_1_1_1-stable/doc/man3/SSL_shutdown.pod
+                return self.get_pin_mut().poll_shutdown(ctx);
+            }
+            Ok(ShutdownResult::Received) => {
+                // close notify sent and received from peer, finished
+                return Poll::Ready(Ok(()));
+            }
+            Err(ref e) if e.code() == ErrorCode::ZERO_RETURN => {
+                // no more read from peer
+                return Poll::Ready(Ok(()));
+            }
             Err(ref e) if e.code() == ErrorCode::WANT_READ || e.code() == ErrorCode::WANT_WRITE => {
                 return Poll::Pending;
             }
@@ -274,7 +287,5 @@ where
                     .unwrap_or_else(|e| io::Error::new(io::ErrorKind::Other, e))));
             }
         }
-
-        self.get_pin_mut().poll_shutdown(ctx)
     }
 }
