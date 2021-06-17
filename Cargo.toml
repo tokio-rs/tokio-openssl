@@ -11,9 +11,7 @@ An implementation of SSL streams for Tokio backed by OpenSSL
 
 [dependencies]
 futures = "0.3"
-openssl = "0.10.32"
-openssl-sys = "0.9"
-pin-project = "1.0"
+openssl = "0.10.34"
 tokio = "1.0"
 
 [dev-dependencies]
