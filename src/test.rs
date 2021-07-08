@@ -1,5 +1,5 @@
 use crate::SslStream;
-use futures::future;
+use futures_util::future;
 use openssl::ssl::{Ssl, SslAcceptor, SslConnector, SslFiletype, SslMethod};
 use std::net::ToSocketAddrs;
 use std::pin::Pin;

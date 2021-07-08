@@ -5,7 +5,7 @@
 //! blocking [`Read`] and [`Write`] traits.
 #![warn(missing_docs)]
 
-use futures::future;
+use futures_util::future;
 use openssl::error::ErrorStack;
 use openssl::ssl::{self, ErrorCode, ShutdownResult, Ssl, SslRef};
 use std::fmt;
