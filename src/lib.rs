@@ -147,6 +147,38 @@ where
         future::poll_fn(|cx| self.as_mut().poll_do_handshake(cx)).await
     }
 
+    /// Try to read data from the stream into the provided buffer, returning how
+    /// many bytes were read.
+    ///
+    /// Receives any pending data from the stream, but does not wait for new
+    /// data to arrive. On success, returns the number of read. Because
+    /// `try_read()` is non-blocking, the buffer does not have to be stored by
+    /// the async task and can exist entirely on the stack.
+    ///
+    /// This function is analagous to [`TcpStream::try_read()`].
+    ///
+    /// [`TcpStream::try_read()`]: tokio::net::TcpStream::try_read()
+    pub fn try_read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        Ok(self.0.read(buf)?)
+    }
+
+    /// Try to write a buffer to the stream, returning how many bytes were
+    /// written.
+    ///
+    /// The function will attempt to write the entire contents of `buf`, but
+    /// only part of the buffer may be written.
+    ///
+    /// If data is successfully written, `Ok(n)` is returned, where `n` is the
+    /// number of bytes written. If the stream is not ready to write data,
+    /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// This function is analagous to [`TcpStream::try_write()`].
+    ///
+    /// [`TcpStream::try_write()`]: tokio::net::TcpStream::try_write()
+    pub fn try_write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        Ok(self.0.write(buf)?)
+    }
+
     /// Like [`SslStream::read_early_data`](ssl::SslStream::read_early_data).
     #[cfg(ossl111)]
     pub fn poll_read_early_data(
