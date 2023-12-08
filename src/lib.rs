@@ -227,12 +227,14 @@ where
         ctx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // SAFETY: read_uninit does not de-initialize the buffer and guarantees that the first nread
-        // bytes are initialized.
-        self.with_context(ctx, |s| unsafe {
-            match cvt(s.read_uninit(buf.unfilled_mut()))? {
+        self.with_context(ctx, |s| {
+            // SAFETY: read_uninit does not de-initialize the buffer.
+            match cvt(s.read_uninit(unsafe { buf.unfilled_mut() }))? {
                 Poll::Ready(nread) => {
-                    buf.assume_init(nread);
+                    // SAFETY: read_uninit guarantees that nread bytes have been initialized.
+                    unsafe {
+                        buf.assume_init(nread);
+                    }
                     buf.advance(nread);
                     Poll::Ready(Ok(()))
                 }
