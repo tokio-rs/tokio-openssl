@@ -232,9 +232,7 @@ where
             match cvt(s.read_uninit(unsafe { buf.unfilled_mut() }))? {
                 Poll::Ready(nread) => {
                     // SAFETY: read_uninit guarantees that nread bytes have been initialized.
-                    unsafe {
-                        buf.assume_init(nread);
-                    }
+                    unsafe { buf.assume_init(nread) };
                     buf.advance(nread);
                     Poll::Ready(Ok(()))
                 }
