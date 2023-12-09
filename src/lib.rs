@@ -11,7 +11,6 @@ use openssl::ssl::{self, ErrorCode, ShutdownResult, Ssl, SslRef};
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::pin::Pin;
-use std::slice;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
@@ -229,17 +228,11 @@ where
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         self.with_context(ctx, |s| {
-            // This isn't really "proper", but rust-openssl doesn't currently expose a suitable interface even though
-            // OpenSSL itself doesn't require the buffer to be initialized. So this is good enough for now.
-            let slice = unsafe {
-                let buf = buf.unfilled_mut();
-                slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len())
-            };
-            match cvt(s.read(slice))? {
+            // SAFETY: read_uninit does not de-initialize the buffer.
+            match cvt(s.read_uninit(unsafe { buf.unfilled_mut() }))? {
                 Poll::Ready(nread) => {
-                    unsafe {
-                        buf.assume_init(nread);
-                    }
+                    // SAFETY: read_uninit guarantees that nread bytes have been initialized.
+                    unsafe { buf.assume_init(nread) };
                     buf.advance(nread);
                     Poll::Ready(Ok(()))
                 }
