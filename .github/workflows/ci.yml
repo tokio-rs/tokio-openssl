@@ -17,7 +17,7 @@ jobs:
     name: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install Rust
         run: |
           rustup update --no-self-update stable
@@ -26,7 +26,7 @@ jobs:
         id: rust-version
         run: echo "::set-output name=version:$(rustc --version)"
       - name: Index cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.cargo/registry/index
           key: index-${{ github.run_id }}
@@ -35,14 +35,14 @@ jobs:
       - name: Create lockfile
         run: cargo generate-lockfile
       - name: Registry cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.cargo/registry/cache
           key: registry-${{ hashFiles('Cargo.lock') }}
       - name: Fetch dependencies
         run: cargo fetch
       - name: Target cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: target
           key: target-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
