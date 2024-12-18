@@ -269,7 +269,17 @@ where
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, ctx: &mut Context) -> Poll<io::Result<()>> {
-        match self.as_mut().with_context(ctx, |s| s.shutdown()) {
+        let maybe_shutdown = |s: &mut openssl::ssl::SslStream<_>| {
+            if s.ssl().is_init_finished() {
+                s.shutdown()
+            } else {
+                // I would really like to return an error with ErrorCode::ZERO_RETURN here,
+                // but there aren't any public methods to create openssl::error::Error
+                Ok(ShutdownResult::Received)
+            }
+        };
+
+        match self.as_mut().with_context(ctx, maybe_shutdown) {
             Ok(ShutdownResult::Sent) | Ok(ShutdownResult::Received) => {}
             Err(ref e) if e.code() == ErrorCode::ZERO_RETURN => {}
             Err(ref e) if e.code() == ErrorCode::WANT_READ || e.code() == ErrorCode::WANT_WRITE => {
